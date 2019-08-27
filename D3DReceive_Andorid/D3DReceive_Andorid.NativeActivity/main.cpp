@@ -16,7 +16,6 @@
 */
 
 #include <malloc.h>
-#include "Receiver.h"
 
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "AndroidProject1.NativeActivity", __VA_ARGS__))
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "AndroidProject1.NativeActivity", __VA_ARGS__))
@@ -221,11 +220,6 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
-	/*		*/
-	//데이터를 받아온다
-	if (!gClient.ReadData())
-		return;
-
 	//그리기 준비
 	init();
 
@@ -234,8 +228,6 @@ static void engine_draw_frame(struct engine* engine) {
 
 	//버퍼 스와핑
 	eglSwapBuffers(engine->display, engine->surface);
-
-	gClient.ReleaseBuffer();
 }
 
 /**
@@ -398,9 +390,15 @@ void android_main(struct android_app* state) {
 				engine.state.angle = 0;
 			}
 
+			//여기서 그리기 업데이트
+			gClient.Request(CHEADER(COMMAND::COMMAND_REQ_FRAME));
+			gClient.RecvResponse();
+
 			// 그리기는 화면 업데이트 속도의 제한을 받으므로
 			// 여기에서는 타이밍을 계산할 필요가 없습니다.
 			engine_draw_frame(&engine);
+
+			gClient.ReleaseBuffer();
 		}
 	}
 }

@@ -33,61 +33,107 @@ bool Client::Connection() {
 }
 
 
-bool Client::ReadData() {
-	//문자열 수신
-	unsigned int size = 0;
+
+bool Client::RecvResponse() {
+	//RES수신
+	memset(&resHeader, -1, sizeof(HEADER));
+	const unsigned int headerSize = sizeof(HEADER);
 	unsigned int totSize = 0;
 	unsigned int nowSize = 0;
-	//char str[256];
 
-	//버퍼 크기 받아오기
+	//헤더 받아오기
 	while (true) {
-		nowSize = recv(serverSock, ((char*)& size) + totSize, sizeof(unsigned int), 0);
+		nowSize = recv(serverSock, ((char*)& resHeader) + totSize, headerSize - totSize, 0);
 		if (nowSize > 0) {
 			totSize += nowSize;
 
-			if (totSize >= sizeof(unsigned int))
+			if (totSize >= headerSize)
 				break;
 		}
 		else {
-			//OutputDebugStringA("데이터 실패\n");
+			__android_log_print(ANDROID_LOG_WARN, "Error", "RES헤더 수신 실패\n");
 			return false;
 		}
 	}
 
 	//버퍼에 데이터 받아오기
-	size = (unsigned int)ntohl(size);
+	const unsigned int size = (unsigned int)ntohl(resHeader.mDataLen);
 
-	if (size <= 0)
+	if (size < 0)
 		return false;
 
-	totSize = 0;
-	nowSize = 0;
+	if (size != 0) {
+		totSize = 0;
+		nowSize = 0;
 
-	data = new char[size];
-	memset(data, 0x00, size);
+		data = new char[size];
+		memset(data, 0x00, size);
 
+		while (true) {
+			nowSize = recv(serverSock, ((char*)data) + totSize, size - totSize, 0);
+			if (nowSize > 0) {
+				totSize += nowSize;
+
+				__android_log_print(ANDROID_LOG_WARN, "Error", "현재 수신된 데이터 %d / %d\n", totSize, size);
+
+				if (totSize >= size)
+					break;
+			}
+			else {
+				__android_log_print(ANDROID_LOG_WARN, "Error", "데이터 수신 실패\n");
+				return false;
+			}
+		}
+
+	}
+
+	__android_log_print(ANDROID_LOG_WARN, "Error", "수신 완료!\n");
+	return true;
+}
+
+bool Client::Request(HEADER reqHeader, void* data) {
+	unsigned int headerSize = sizeof(HEADER);
+	unsigned int totSize = 0;
+	unsigned int nowSize = 0;
+
+	//REQ전송
 	while (true) {
-		nowSize = recv(serverSock, ((char*)data) + totSize, size - totSize, 0);
+		nowSize = send(serverSock, ((char*)& reqHeader) + totSize, headerSize - totSize, 0);
 		if (nowSize > 0) {
 			totSize += nowSize;
 
-			//wsprintfA(str, "현재 수신된 데이터 %d / %d\n", totSize, size);
-			//OutputDebugStringA(str);
-
-			if (totSize >= size)
+			if (totSize >= headerSize)
 				break;
 		}
 		else {
-			//OutputDebugStringA("데이터 실패\n");
+			__android_log_print(ANDROID_LOG_WARN, "Error", "REQ헤더 송신 실패\n");
 			return false;
 		}
 	}
 
-	//OutputDebugStringA("수신 완료!\n");
+	//Data도 있을 시 같이 전송
+	if (data != nullptr) {
+		const unsigned int dataSize = reqHeader.mDataLen;
+		totSize = 0;
+		nowSize = 0;
+
+		while (true) {
+			nowSize = send(serverSock, ((char*)data) + totSize, dataSize - totSize, 0);
+			if (nowSize > 0) {
+				totSize += nowSize;
+
+				if (totSize >= dataSize)
+					break;
+			}
+			else {
+				__android_log_print(ANDROID_LOG_WARN,"Error", "Data 송신 실패\n");
+				return false;
+			}
+		}
+	}
+
 	return true;
 }
-
 
 char* Client::GetData() {
 	return (char*)data;
@@ -95,9 +141,8 @@ char* Client::GetData() {
 
 void Client::ReleaseBuffer() {
 	if (data != nullptr) {
-		delete (char*)data;
+		delete data;
 		data = nullptr;
 	}
 }
-
 

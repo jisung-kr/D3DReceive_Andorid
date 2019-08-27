@@ -32,3 +32,5 @@
 #include <stdlib.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
+
+#include "Receiver.h"
