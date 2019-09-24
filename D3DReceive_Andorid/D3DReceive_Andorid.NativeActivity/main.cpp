@@ -398,7 +398,7 @@ void android_main(struct android_app* state) {
 			// 여기에서는 타이밍을 계산할 필요가 없습니다.
 			engine_draw_frame(&engine);
 
-			gClient.ReleaseBuffer();
+			//gClient.ReleaseBuffer();
 		}
 	}
 }

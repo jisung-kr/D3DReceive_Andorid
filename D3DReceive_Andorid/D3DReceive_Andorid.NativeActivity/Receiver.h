@@ -6,7 +6,7 @@
 
 //#define SERVER_IP "127.0.0.1"
 //#define SERVER_IP "61.73.65.218"
-#define SERVER_IP "59.10.192.66"
+#define SERVER_IP "119.192.192.116"
 
 enum COMMAND {
 	//임시 명령
