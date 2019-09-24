@@ -391,14 +391,13 @@ void android_main(struct android_app* state) {
 			}
 
 			//여기서 그리기 업데이트
-			gClient.Request(CHEADER(COMMAND::COMMAND_REQ_FRAME));
-			gClient.RecvResponse();
+			gClient.SendMSG(CHEADER(COMMAND::COMMAND_REQ_FRAME));
+			gClient.RecvMSG();
 
 			// 그리기는 화면 업데이트 속도의 제한을 받으므로
 			// 여기에서는 타이밍을 계산할 필요가 없습니다.
 			engine_draw_frame(&engine);
 
-			//gClient.ReleaseBuffer();
 		}
 	}
 }
