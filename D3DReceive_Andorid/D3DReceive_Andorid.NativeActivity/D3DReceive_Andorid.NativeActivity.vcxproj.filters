@@ -6,6 +6,9 @@
     <ClInclude Include="Receiver.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="BitmapQueue.h">
+      <Filter>Queue</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />
@@ -13,10 +16,16 @@
     <ClCompile Include="Receiver.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="BitmapQueue.cpp">
+      <Filter>Queue</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Network">
       <UniqueIdentifier>{c048c773-1ed2-4025-95ff-78fa651ac4cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Queue">
+      <UniqueIdentifier>{75466907-53ba-4aa0-9c46-b4cfbce4a180}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

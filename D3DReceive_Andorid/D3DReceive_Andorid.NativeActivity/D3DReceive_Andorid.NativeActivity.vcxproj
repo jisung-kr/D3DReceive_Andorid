@@ -203,12 +203,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BitmapQueue.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="android_native_app_glue.h" />
     <ClInclude Include="Receiver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />
+    <ClCompile Include="BitmapQueue.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Receiver.cpp" />
   </ItemGroup>

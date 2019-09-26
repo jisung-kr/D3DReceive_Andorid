@@ -21,7 +21,14 @@
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "AndroidProject1.NativeActivity", __VA_ARGS__))
 #define LOGE(...) (printf("(E): " __VA_ARGS__))
 
+/* 서버와 연결하기 위한 클라이언트 객체및 스레드*/
 Client gClient;
+std::thread* NetworkRecvThread = nullptr;
+std::thread* NetworkSendThread = nullptr;
+
+
+
+
 
 /**
 * 저장된 상태 데이터입니다.
@@ -220,14 +227,31 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
-	//그리기 준비
-	init();
+	if (!gClient.SendMSG()) {
+		return;
+	}
+	if (!gClient.RecvMSG()) {
+		return;
+	}
 
-	//그리기
-	display();
+	if (gClient.SizeRQueue() > 0) {
+		// 그리기는 화면 업데이트 속도의 제한을 받으므로
+		// 여기에서는 타이밍을 계산할 필요가 없습니다.
+		LOGW("Drawing...\n");
+		//그리기 준비
+		init();
 
-	//버퍼 스와핑
-	eglSwapBuffers(engine->display, engine->surface);
+		//그리기
+		display();
+
+		//버퍼 스와핑
+		eglSwapBuffers(engine->display, engine->surface);
+
+
+		gClient.PopPacketRQueue();
+		gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));
+	}
+
 }
 
 /**
@@ -342,7 +366,31 @@ void android_main(struct android_app* state) {
 	//소켓
 	gClient.Init();	//소켓 초기화
 	gClient.Connection();	//소켓 연결
+	gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));	//처음 프레임 요구
 
+	/*
+	if (NetworkSendThread == nullptr) {
+		NetworkSendThread = new std::thread([&]() -> void {
+			while (true) {
+				if (!gClient.SendMSG()) {
+					break;
+				}
+				LOGW("Sending Success...\n");
+			}
+			});
+	}
+
+	if (NetworkRecvThread == nullptr) {
+		NetworkRecvThread = new std::thread([&]() -> void {
+			while (true) {
+				if (!gClient.RecvMSG()) {
+					break;
+				}
+				LOGW("Receiving Success...\n");
+			}
+			});
+	}
+	*/
 
 	//수행할 작업을 대기하면서 루프를 실행합니다.
 
@@ -389,15 +437,9 @@ void android_main(struct android_app* state) {
 			if (engine.state.angle > 1) {
 				engine.state.angle = 0;
 			}
-
+			
 			//여기서 그리기 업데이트
-			gClient.SendMSG(CHEADER(COMMAND::COMMAND_REQ_FRAME));
-			gClient.RecvMSG();
-
-			// 그리기는 화면 업데이트 속도의 제한을 받으므로
-			// 여기에서는 타이밍을 계산할 필요가 없습니다.
 			engine_draw_frame(&engine);
-
 		}
 	}
 }
