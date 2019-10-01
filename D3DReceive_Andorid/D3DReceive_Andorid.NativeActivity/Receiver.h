@@ -7,9 +7,9 @@
 #define BUFFER_SIZE 1024
 #define PORT 45000
 
-//#define SERVER_IP "127.0.0.1"
+#define SERVER_IP "127.0.0.1"
 //#define SERVER_IP "61.73.65.218"
-#define SERVER_IP "121.131.167.123"
+//#define SERVER_IP "121.131.167.123"
 
 struct WSABUF {
 	char* buf;
@@ -70,12 +70,14 @@ struct Packet {
 	Packet() {
 		mHeader.buf = new char[headerSize];
 		mHeader.len = 0;
+
+		mData.buf = nullptr;
 	}
 
 	Packet(HEADER* header, void* data = nullptr) {
 		mHeader.buf = (char*)header;
 		mHeader.len = 0;
-
+		mData.buf = nullptr;
 		if (data != nullptr) {
 			int64_t dataSize = ntohl(header->mDataLen);
 			mData.buf = (char*)data;

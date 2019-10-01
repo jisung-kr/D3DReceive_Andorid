@@ -37,6 +37,9 @@ struct saved_state {
 	float angle;
 	int32_t x;
 	int32_t y;
+	int32_t lastX = -1;
+	int32_t lastY = -1;
+	bool isCaptured = false;
 };
 
 /**
@@ -227,6 +230,7 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
+	/*		*/
 	if (!gClient.SendMSG()) {
 		return;
 	}
@@ -234,10 +238,34 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
+	/*	
+	if (NetworkSendThread == nullptr) {
+		NetworkSendThread = new std::thread([&]() -> void {
+			while (true) {
+				if (!gClient.SendMSG()) {
+					break;
+				}
+				LOGW("Sending Success...\n");
+			}
+			});
+	}
+
+	if (NetworkRecvThread == nullptr) {
+		NetworkRecvThread = new std::thread([&]() -> void {
+			while (true) {
+				if (!gClient.RecvMSG()) {
+					break;
+				}
+				LOGW("Receiving Success...\n");
+			}
+			});
+	}
+	*/
 	if (gClient.SizeRQueue() > 0) {
 		// 그리기는 화면 업데이트 속도의 제한을 받으므로
 		// 여기에서는 타이밍을 계산할 필요가 없습니다.
-		LOGW("Drawing...\n");
+		LOGI("Drawing...\n");
+
 		//그리기 준비
 		init();
 
@@ -279,11 +307,58 @@ static void engine_term_display(struct engine* engine) {
 */
 static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
 	struct engine* engine = (struct engine*)app->userData;
-	if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-		engine->state.x = AMotionEvent_getX(event, 0);
-		engine->state.y = AMotionEvent_getY(event, 0);
-		return 1;
+
+	int32_t sourceType = AInputEvent_getSource(event);
+	int32_t eventType = AInputEvent_getType(event);
+	int32_t actionType = AKeyEvent_getAction(event);
+
+
+	//__android_log_print(ANDROID_LOG_DEBUG, "Debug", "SourceType = %d \nEventType = %d\nActionType = %d", sourceType, eventType, actionType);
+
+
+	if (sourceType & AINPUT_SOURCE_JOYSTICK) {
+		if (eventType == AINPUT_EVENT_TYPE_KEY) {
+
+
+
+
+		}
+		else if (eventType == AINPUT_EVENT_TYPE_MOTION) {
+			if (actionType == AMOTION_EVENT_ACTION_MOVE) {
+
+				float x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
+				float y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
+				float z = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
+				float w = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
+		
+				engine->state.isCaptured = true;
+				INPUT_DATA* data = new INPUT_DATA();
+				int dataSize = sizeof(INPUT_DATA);
+				memset(data, 0x00, dataSize);
+
+				data->mInputType = INPUT_TYPE::INPUT_MOUSE_MOVE;
+				data->x = z;
+				data->y = w;
+
+				gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+
+				__android_log_print(ANDROID_LOG_DEBUG, "Debug", "Down X = %f / Y = %f / Z = %f / W = %f", x, y, z, w);
+				return 1;
+			}
+
+
+		}
 	}
+	else if (sourceType & AINPUT_SOURCE_GAMEPAD) {
+
+	}
+
+
+
+
+
+
+	//0일경우 시스템에서 디폴트 처리
 	return 0;
 }
 
@@ -355,45 +430,23 @@ void android_main(struct android_app* state) {
 	engine.sensorEventQueue = ASensorManager_createEventQueue(engine.sensorManager,
 		state->looper, LOOPER_ID_USER, NULL, NULL);
 
-	if (state->savedState != NULL) {
-		// 이전에 저장된 상태로 시작되며, 이 지점에서 복원됩니다.
-		engine.state = *(struct saved_state*)state->savedState;
-	}
-
-	engine.animating = 1;
-
 
 	//소켓
 	gClient.Init();	//소켓 초기화
 	gClient.Connection();	//소켓 연결
 	gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));	//처음 프레임 요구
 
-	/*
-	if (NetworkSendThread == nullptr) {
-		NetworkSendThread = new std::thread([&]() -> void {
-			while (true) {
-				if (!gClient.SendMSG()) {
-					break;
-				}
-				LOGW("Sending Success...\n");
-			}
-			});
+
+	if (state->savedState != NULL) {
+		// 이전에 저장된 상태로 시작되며, 이 지점에서 복원됩니다.
+		engine.state = *(struct saved_state*)state->savedState;
 	}
 
-	if (NetworkRecvThread == nullptr) {
-		NetworkRecvThread = new std::thread([&]() -> void {
-			while (true) {
-				if (!gClient.RecvMSG()) {
-					break;
-				}
-				LOGW("Receiving Success...\n");
-			}
-			});
-	}
-	*/
+
+	engine.animating = 1;
+
 
 	//수행할 작업을 대기하면서 루프를 실행합니다.
-
 	while (1) {
 		// 보류 중인 모든 이벤트를 읽습니다.
 		int ident;
