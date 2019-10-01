@@ -26,10 +26,6 @@ Client gClient;
 std::thread* NetworkRecvThread = nullptr;
 std::thread* NetworkSendThread = nullptr;
 
-
-
-
-
 /**
 * 저장된 상태 데이터입니다.
 */
@@ -37,9 +33,8 @@ struct saved_state {
 	float angle;
 	int32_t x;
 	int32_t y;
-	int32_t lastX = -1;
-	int32_t lastY = -1;
-	bool isCaptured = false;
+	int32_t z;
+	int32_t w;
 };
 
 /**
@@ -61,6 +56,9 @@ struct engine {
 	struct saved_state state;
 };
 
+
+float ConvertToRadian(float degree) { return degree * (M_PI / 180.0f); }
+float ConvertToDegree(float radian) { return radian * (180.0f/ M_PI); }
 
 
 /**
@@ -230,7 +228,7 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
-	/*		*/
+	/*		
 	if (!gClient.SendMSG()) {
 		return;
 	}
@@ -238,28 +236,6 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
-	/*	
-	if (NetworkSendThread == nullptr) {
-		NetworkSendThread = new std::thread([&]() -> void {
-			while (true) {
-				if (!gClient.SendMSG()) {
-					break;
-				}
-				LOGW("Sending Success...\n");
-			}
-			});
-	}
-
-	if (NetworkRecvThread == nullptr) {
-		NetworkRecvThread = new std::thread([&]() -> void {
-			while (true) {
-				if (!gClient.RecvMSG()) {
-					break;
-				}
-				LOGW("Receiving Success...\n");
-			}
-			});
-	}
 	*/
 	if (gClient.SizeRQueue() > 0) {
 		// 그리기는 화면 업데이트 속도의 제한을 받으므로
@@ -313,7 +289,7 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 	int32_t actionType = AKeyEvent_getAction(event);
 
 
-	//__android_log_print(ANDROID_LOG_DEBUG, "Debug", "SourceType = %d \nEventType = %d\nActionType = %d", sourceType, eventType, actionType);
+	__android_log_print(ANDROID_LOG_DEBUG, "Debug", "SourceType = %d \nEventType = %d\nActionType = %d", sourceType, eventType, actionType);
 
 
 	if (sourceType & AINPUT_SOURCE_JOYSTICK) {
@@ -324,28 +300,69 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 
 		}
 		else if (eventType == AINPUT_EVENT_TYPE_MOTION) {
-			if (actionType == AMOTION_EVENT_ACTION_MOVE) {
-
+			/*		*/
+			if (actionType == AMOTION_EVENT_ACTION_DOWN) {
+				engine->state.x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
+				engine->state.y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
+				engine->state.z = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
+				engine->state.w = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
+			}
+			else if (actionType == AMOTION_EVENT_ACTION_MOVE) {
+				// xy는 왼쪽 축
+				// wz는 오른쪽 축
 				float x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
 				float y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
 				float z = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
 				float w = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
-		
-				engine->state.isCaptured = true;
-				INPUT_DATA* data = new INPUT_DATA();
-				int dataSize = sizeof(INPUT_DATA);
-				memset(data, 0x00, dataSize);
 
-				data->mInputType = INPUT_TYPE::INPUT_MOUSE_MOVE;
-				data->x = z;
-				data->y = w;
+				float lastX = engine->state.x;
+				float lastY = engine->state.y;
+				float lastZ = engine->state.z;
+				float lastW = engine->state.w;
 
-				gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+				if (x > 0.03f || y > 0.03f) {
+					float dx = x;
+					float dy = -y;
+
+					INPUT_DATA* data = new INPUT_DATA();
+					int dataSize = sizeof(INPUT_DATA);
+					memset(data, 0x00, dataSize);
+
+					data->mInputType = INPUT_TYPE::INPUT_AXIS_CAMERA_MOVE;
+					data->x = dx;
+					data->y = dy;
+
+					gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+				}
+
+
+				if (z != lastZ || w != lastW) {
+					float dx = ConvertToRadian(0.25f * static_cast<float>(z - lastZ));
+					float dy = ConvertToRadian(0.25f * static_cast<float>(w - lastW));
+
+					INPUT_DATA* data = new INPUT_DATA();
+					int dataSize = sizeof(INPUT_DATA);
+					memset(data, 0x00, dataSize);
+
+					data->mInputType = INPUT_TYPE::INPUT_AXIS_CAMERA_ROT;
+					data->z = dx;
+					data->w = dy;
+
+					gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+				}
+
+				engine->state.x = x;
+				engine->state.y = y;
+				engine->state.w = w;
+				engine->state.z = z;
 
 				__android_log_print(ANDROID_LOG_DEBUG, "Debug", "Down X = %f / Y = %f / Z = %f / W = %f", x, y, z, w);
-				return 1;
+				
+				return 0;
 			}
 
+
+	
 
 		}
 	}
@@ -435,6 +452,29 @@ void android_main(struct android_app* state) {
 	gClient.Init();	//소켓 초기화
 	gClient.Connection();	//소켓 연결
 	gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));	//처음 프레임 요구
+
+		/*	*/
+	if (NetworkSendThread == nullptr) {
+		NetworkSendThread = new std::thread([&]() -> void {
+			while (true) {
+				if (!gClient.SendMSG()) {
+					break;
+				}
+				LOGW("Sending Success...\n");
+			}
+			});
+	}
+
+	if (NetworkRecvThread == nullptr) {
+		NetworkRecvThread = new std::thread([&]() -> void {
+			while (true) {
+				if (!gClient.RecvMSG()) {
+					break;
+				}
+				LOGW("Receiving Success...\n");
+			}
+			});
+	}
 
 
 	if (state->savedState != NULL) {

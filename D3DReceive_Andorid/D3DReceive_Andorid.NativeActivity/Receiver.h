@@ -28,16 +28,18 @@ enum INPUT_TYPE {
 	INPUT_KEY_S = 1,
 	INPUT_KEY_A = 2,
 	INPUT_KEY_D = 3,
-	INPUT_MOUSE_MOVE,
+	INPUT_AXIS_CAMERA_MOVE,
+	INPUT_AXIS_CAMERA_ROT,
 	INPUT_MAX
 };
 
 struct INPUT_DATA {
 	INPUT_TYPE mInputType;
 	float deltaTime;
-	float x;
-	float y;
-	float z;
+	float x = 0.0f;
+	float y = 0.0f;
+	float z = 0.0f;
+	float w = 0.0f;
 };
 
 struct HEADER {
