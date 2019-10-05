@@ -21,6 +21,9 @@
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "AndroidProject1.NativeActivity", __VA_ARGS__))
 #define LOGE(...) (printf("(E): " __VA_ARGS__))
 
+
+using namespace std;
+
 /* 서버와 연결하기 위한 클라이언트 객체및 스레드*/
 Client gClient;
 std::thread* NetworkRecvThread = nullptr;
@@ -228,15 +231,6 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 	}
 
-	/*		
-	if (!gClient.SendMSG()) {
-		return;
-	}
-	if (!gClient.RecvMSG()) {
-		return;
-	}
-
-	*/
 	if (gClient.SizeRQueue() > 0) {
 		// 그리기는 화면 업데이트 속도의 제한을 받으므로
 		// 여기에서는 타이밍을 계산할 필요가 없습니다.
@@ -253,7 +247,6 @@ static void engine_draw_frame(struct engine* engine) {
 
 
 		gClient.PopPacketRQueue();
-		gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));
 	}
 
 }
@@ -295,9 +288,6 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 	if (sourceType & AINPUT_SOURCE_JOYSTICK) {
 		if (eventType == AINPUT_EVENT_TYPE_KEY) {
 
-
-
-
 		}
 		else if (eventType == AINPUT_EVENT_TYPE_MOTION) {
 			/*		*/
@@ -320,10 +310,10 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 				float lastZ = engine->state.z;
 				float lastW = engine->state.w;
 
-				if (x > 0.03f || y > 0.03f) {
-					float dx = x;
-					float dy = -y;
+				float dx = x;
+				float dy = -y;
 
+				{	
 					INPUT_DATA* data = new INPUT_DATA();
 					int dataSize = sizeof(INPUT_DATA);
 					memset(data, 0x00, dataSize);
@@ -332,24 +322,26 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 					data->x = dx;
 					data->y = dy;
 
-					gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+				
 				}
 
+	
+				float dz = ConvertToRadian(0.25f * static_cast<float>(z - lastZ));
+				float dw = ConvertToRadian(0.25f * static_cast<float>(w - lastW));
 
-				if (z != lastZ || w != lastW) {
-					float dx = ConvertToRadian(0.25f * static_cast<float>(z - lastZ));
-					float dy = ConvertToRadian(0.25f * static_cast<float>(w - lastW));
-
+				{
 					INPUT_DATA* data = new INPUT_DATA();
 					int dataSize = sizeof(INPUT_DATA);
 					memset(data, 0x00, dataSize);
 
 					data->mInputType = INPUT_TYPE::INPUT_AXIS_CAMERA_ROT;
-					data->z = dx;
-					data->w = dy;
+					data->z = dz;
+					data->w = dw;
 
-					gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
+					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
 				}
+
 
 				engine->state.x = x;
 				engine->state.y = y;
@@ -451,18 +443,19 @@ void android_main(struct android_app* state) {
 	//소켓
 	gClient.Init();	//소켓 초기화
 	gClient.Connection();	//소켓 연결
-	gClient.PushPacketWQueue(new Packet(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));	//처음 프레임 요구
 
 		/*	*/
 	if (NetworkSendThread == nullptr) {
 		NetworkSendThread = new std::thread([&]() -> void {
 			while (true) {
+				gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));	
+
 				if (!gClient.SendMSG()) {
 					break;
 				}
 				LOGW("Sending Success...\n");
 			}
-			});
+		});
 	}
 
 	if (NetworkRecvThread == nullptr) {
@@ -473,7 +466,7 @@ void android_main(struct android_app* state) {
 				}
 				LOGW("Receiving Success...\n");
 			}
-			});
+		});
 	}
 
 

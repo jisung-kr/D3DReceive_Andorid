@@ -99,9 +99,8 @@ struct Packet {
 class Client {
 public:
 	Client() {
-		IsUsingRQueue = IsUsingWQueue = false;
-
-		CountCMDRequestFrame = 0;
+		isUsingRQueue = isUsingWQueue = isUsingInputWQueue = false;
+		reqFrameCount = 0;
 	}
 
 	virtual ~Client();
@@ -111,13 +110,14 @@ private:
 	int serverSock;
 	sockaddr_in serverAddr;
 
-	QueueEX<Packet*> rQueue;
-	QueueEX<Packet*> wQueue;
+	QueueEX<std::unique_ptr<Packet>> rQueue;
+	QueueEX<std::unique_ptr<Packet>> wQueue;
+	QueueEX<std::unique_ptr<Packet>> inputWQueue;
 
-	std::atomic<bool> IsUsingRQueue;
-	std::atomic<bool> IsUsingWQueue;
-
-	std::atomic<int> CountCMDRequestFrame;
+	std::atomic<bool> isUsingWQueue ;
+	std::atomic<bool> isUsingInputWQueue ;
+	std::atomic<bool> isUsingRQueue ;
+	std::atomic<int> reqFrameCount ;
 
 	int64_t headerSize = sizeof(HEADER);
 
@@ -128,7 +128,7 @@ public:
 	bool RecvMSG();
 	bool SendMSG();
 
-	void PushPacketWQueue(Packet* packet);
+	void PushPacketWQueue(std::unique_ptr<Packet>&& packet);
 	void PopPacketRQueue();
 
 	int SizeRQueue() { return rQueue.Size(); }
@@ -138,9 +138,9 @@ public:
 	void ReleaseBuffer();
 
 private:
-	bool RecvHeader(Packet& packet);
-	bool RecvData(Packet& packet);
+	bool RecvHeader(Packet* packet);
+	bool RecvData(Packet* packet);
 
-	bool SendHeader(Packet& packet);
-	bool SendData(Packet& packet);
+	bool SendHeader(Packet* packet);
+	bool SendData(Packet* packet);
 };
