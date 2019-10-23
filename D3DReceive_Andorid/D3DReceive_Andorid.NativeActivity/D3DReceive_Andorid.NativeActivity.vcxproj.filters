@@ -9,6 +9,9 @@
     <ClInclude Include="BitmapQueue.h">
       <Filter>Queue</Filter>
     </ClInclude>
+    <ClInclude Include="lz4.h">
+      <Filter>Codec</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />
@@ -19,6 +22,9 @@
     <ClCompile Include="BitmapQueue.cpp">
       <Filter>Queue</Filter>
     </ClCompile>
+    <ClCompile Include="lz4.cpp">
+      <Filter>Codec</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Network">
@@ -26,6 +32,9 @@
     </Filter>
     <Filter Include="Queue">
       <UniqueIdentifier>{75466907-53ba-4aa0-9c46-b4cfbce4a180}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Codec">
+      <UniqueIdentifier>{4a1717f0-fd46-4f26-9e17-86d2f1fcf90a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

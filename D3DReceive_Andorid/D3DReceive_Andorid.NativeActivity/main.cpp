@@ -28,6 +28,7 @@ using namespace std;
 Client gClient;
 std::thread* NetworkRecvThread = nullptr;
 std::thread* NetworkSendThread = nullptr;
+bool canRunning = true;
 
 /**
 * 저장된 상태 데이터입니다.
@@ -135,17 +136,17 @@ static int engine_init_display(struct engine* engine) {
 GLuint texture[1];
 
 GLfloat square[] = {
-	-1.0f, -1.0f,  0.0f,
+	 -1.0f, -1.0f,  0.0f,
 	 1.0f, -1.0f,  0.0f,
-	-1.0f,  1.0f,  0.0f,
+	 -1.0f,  1.0f,  0.0f,
 	 1.0f,  1.0f,  0.0f,
 };
 
 GLfloat texCoords[] = {
 	// FRONT
-	 0.0f, 0.0f,
-	 1.0f, 0.0f,
-	 0.0f, 1.0f,
+	 -1.0f, -1.0f,
+	 1.0f, -1.0f,
+	 -1.0f, 1.0f,
 	 1.0f, 1.0f,
 };
 
@@ -153,9 +154,9 @@ float lightAmbient[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 float matAmbient[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-//크기 추후에 수정 필요
-#define WIDTH 640
-#define HEIGHT 441
+const int mClientWidth = 1024;
+const int mClinetHeight = 576;
+
 
 bool loadTextures(char* bitmap)
 {
@@ -166,10 +167,10 @@ bool loadTextures(char* bitmap)
 
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
 	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, WIDTH,
-		HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mClientWidth,
+		mClinetHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,
 		bitmap);
-
+	
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -178,8 +179,14 @@ bool loadTextures(char* bitmap)
 
 bool init()
 {
+	//압축 해제 후 텍스쳐 생성
+	int size = mClientWidth * mClinetHeight * 4;
+	char* srcData = new char[size];
 
-	loadTextures(gClient.GetData());
+	LZ4_decompress_fast(gClient.GetData(), srcData, size);
+	loadTextures(srcData);
+
+	delete[] srcData;
 
 	glEnable(GL_TEXTURE_2D);
 
@@ -204,19 +211,19 @@ void display()
 	
 	//투영행렬 초기화
 	glMatrixMode(GL_PROJECTION);
+
 	glLoadIdentity();
 	glOrthof(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
-
 	
 	//텍스쳐 행렬 초기화(텍스쳐 y축이 반대임)
 	glMatrixMode(GL_TEXTURE);
 	glLoadIdentity();
 	glPushMatrix();
+	
 	glRotatef(90, 0.0f, 0.0f, 1.0f);
 	glRotatef(180, 1.0f, 0.0f, 0.0f);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glPopMatrix();
-
 
 	glFlush();
 }
@@ -319,8 +326,8 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 					memset(data, 0x00, dataSize);
 
 					data->mInputType = INPUT_TYPE::INPUT_AXIS_CAMERA_MOVE;
-					data->x = dx;
-					data->y = dy;
+					data->x = dx * 10;
+					data->y = dy * 10;
 
 					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
 				
@@ -336,8 +343,8 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 					memset(data, 0x00, dataSize);
 
 					data->mInputType = INPUT_TYPE::INPUT_AXIS_CAMERA_ROT;
-					data->z = dz;
-					data->w = dw;
+					data->z = dz * 5;
+					data->w = dw * 5;
 
 					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
 				}
@@ -363,10 +370,6 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 	}
 
 
-
-
-
-
 	//0일경우 시스템에서 디폴트 처리
 	return 0;
 }
@@ -377,6 +380,37 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 	struct engine* engine = (struct engine*)app->userData;
 	switch (cmd) {
+	case APP_CMD_START:
+		//소켓
+		gClient.Init();	//소켓 초기화
+		gClient.Connection();	//소켓 연결
+
+			/*	*/
+		if (NetworkSendThread == nullptr) {
+			NetworkSendThread = new std::thread([&]() -> void {
+				while (canRunning) {
+					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));
+
+					if (!gClient.SendMSG()) {
+						break;
+					}
+					LOGW("Sending Success...\n");
+				}
+				});
+		}
+
+		if (NetworkRecvThread == nullptr) {
+			NetworkRecvThread = new std::thread([&]() -> void {
+				while (canRunning) {
+					if (!gClient.RecvMSG()) {
+						break;
+					}
+					LOGW("Receiving Success...\n");
+				}
+				});
+		}
+
+		break;
 	case APP_CMD_SAVE_STATE:
 		// 시스템에서 현재 상태를 저장하도록 요청했습니다. 저장하세요.
 		engine->app->savedState = malloc(sizeof(struct saved_state));
@@ -403,6 +437,7 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 			ASensorEventQueue_setEventRate(engine->sensorEventQueue,
 				engine->accelerometerSensor, (1000L / 60) * 1000);
 		}
+
 		break;
 	case APP_CMD_LOST_FOCUS:
 		// 앱에서 포커스가 사라지면 가속도계 모니터링이 중지됩니다.
@@ -411,10 +446,12 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 			ASensorEventQueue_disableSensor(engine->sensorEventQueue,
 				engine->accelerometerSensor);
 		}
+
 		// 애니메이션도 중지됩니다.
 		engine->animating = 0;
 		engine_draw_frame(engine);
 		break;
+
 	}
 }
 
@@ -438,36 +475,6 @@ void android_main(struct android_app* state) {
 		ASENSOR_TYPE_ACCELEROMETER);
 	engine.sensorEventQueue = ASensorManager_createEventQueue(engine.sensorManager,
 		state->looper, LOOPER_ID_USER, NULL, NULL);
-
-
-	//소켓
-	gClient.Init();	//소켓 초기화
-	gClient.Connection();	//소켓 연결
-
-		/*	*/
-	if (NetworkSendThread == nullptr) {
-		NetworkSendThread = new std::thread([&]() -> void {
-			while (true) {
-				gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));	
-
-				if (!gClient.SendMSG()) {
-					break;
-				}
-				LOGW("Sending Success...\n");
-			}
-		});
-	}
-
-	if (NetworkRecvThread == nullptr) {
-		NetworkRecvThread = new std::thread([&]() -> void {
-			while (true) {
-				if (!gClient.RecvMSG()) {
-					break;
-				}
-				LOGW("Receiving Success...\n");
-			}
-		});
-	}
 
 
 	if (state->savedState != NULL) {

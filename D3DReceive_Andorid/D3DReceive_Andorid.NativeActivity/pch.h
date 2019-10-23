@@ -39,3 +39,4 @@
 #include <atomic>
 
 #include "Receiver.h"
+#include "lz4.h"

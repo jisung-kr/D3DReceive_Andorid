@@ -74,6 +74,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>Clang_5_0</PlatformToolset>
+    <AndroidAPILevel>android-24</AndroidAPILevel>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -140,6 +141,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <CompileAs>CompileAsCpp</CompileAs>
+      <CppLanguageStandard>c++1z</CppLanguageStandard>
     </ClCompile>
     <Link>
       <LibraryDependencies>%(LibraryDependencies);GLESv1_CM;EGL;</LibraryDependencies>
@@ -207,6 +209,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="BitmapQueue.h" />
+    <ClInclude Include="lz4.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="android_native_app_glue.h" />
     <ClInclude Include="Receiver.h" />
@@ -214,6 +217,7 @@
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />
     <ClCompile Include="BitmapQueue.cpp" />
+    <ClCompile Include="lz4.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Receiver.cpp" />
   </ItemGroup>
