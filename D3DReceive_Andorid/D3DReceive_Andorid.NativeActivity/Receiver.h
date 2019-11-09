@@ -4,7 +4,7 @@
 #include "BitmapQueue.h"
 
 
-#define SERVER_IP "121.162.36.126"
+#define SERVER_IP "121.131.125.43"
 #define PORT 45000
 
 
@@ -14,17 +14,18 @@ struct WSABUF {
 };
 
 enum COMMAND {
-	COMMAND_REQ_FRAME = 0,
-	COMMAND_RES_FRAME = 1,
-	COMMAND_INPUT = 2,
+	COMMAND_HELLO = 0,
+	COMMAND_REQ_FRAME,
+	COMMAND_RES_FRAME,
+	COMMAND_INPUT,
 	COMMAND_MAX
 };
 
 enum INPUT_TYPE {
-	INPUT_KEY_W = 0,
-	INPUT_KEY_S = 1,
-	INPUT_KEY_A = 2,
-	INPUT_KEY_D = 3,
+	INPUT_KEY_W,
+	INPUT_KEY_S,
+	INPUT_KEY_A,
+	INPUT_KEY_D,
 	INPUT_AXIS_CAMERA_MOVE,
 	INPUT_AXIS_CAMERA_ROT,
 	INPUT_MAX
@@ -93,6 +94,17 @@ struct Packet {
 
 };
 
+struct DeviceInfo {
+	enum PixelOrder {
+		RGBA = 0,
+		BGRA
+	};
+
+	int mClientWidth;
+	int mClientHeight;
+	PixelOrder mClientPixelOreder;
+};
+
 class Client {
 public:
 	Client() {
@@ -125,14 +137,14 @@ public:
 	bool RecvMSG();
 	bool SendMSG();
 
-	void PushPacketWQueue(std::unique_ptr<Packet>&& packet);
+	void PushPacketWQueue(std::unique_ptr<Packet> packet);
 	void PopPacketRQueue();
 
 	int SizeRQueue() { return rQueue.Size(); }
 	int SizeWQueue() { return wQueue.Size(); }
 
 	char* GetData();
-	void ReleaseBuffer();
+	int GetSocket();
 
 private:
 	bool RecvHeader(Packet* packet);

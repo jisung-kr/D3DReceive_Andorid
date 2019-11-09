@@ -26,6 +26,9 @@ using namespace std;
 
 /* 서버와 연결하기 위한 클라이언트 객체및 스레드*/
 Client gClient;
+const int mClientWidth = 1024;
+const int mClientHeight = 576;
+const DeviceInfo::PixelOrder pixelOrder = DeviceInfo::PixelOrder::RGBA;
 std::thread* NetworkRecvThread = nullptr;
 std::thread* NetworkSendThread = nullptr;
 bool canRunning = true;
@@ -154,8 +157,6 @@ float lightAmbient[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 float matAmbient[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-const int mClientWidth = 1024;
-const int mClinetHeight = 576;
 
 
 bool loadTextures(char* bitmap)
@@ -168,7 +169,7 @@ bool loadTextures(char* bitmap)
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
 	
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mClientWidth,
-		mClinetHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+		mClientHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,
 		bitmap);
 	
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -180,7 +181,7 @@ bool loadTextures(char* bitmap)
 bool init()
 {
 	//압축 해제 후 텍스쳐 생성
-	int size = mClientWidth * mClinetHeight * 4;
+	int size = mClientWidth * mClientHeight * 4;
 	char* srcData = new char[size];
 
 	LZ4_decompress_fast(gClient.GetData(), srcData, size);
@@ -381,11 +382,21 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 	struct engine* engine = (struct engine*)app->userData;
 	switch (cmd) {
 	case APP_CMD_START:
+	{
 		//소켓
 		gClient.Init();	//소켓 초기화
 		gClient.Connection();	//소켓 연결
 
-			/*	*/
+		//디바이스 정보 보내기
+		//서버로 디바이스 정보 전달
+		DeviceInfo dInfo;
+		dInfo.mClientWidth = mClientWidth;
+		dInfo.mClientHeight = mClientHeight;
+		dInfo.mClientPixelOreder = pixelOrder;
+		Packet helloPacket = Packet(new CHEADER(COMMAND::COMMAND_HELLO, sizeof(DeviceInfo)), (void*)& dInfo);
+
+		send(gClient.GetSocket(), (char*)& dInfo, sizeof(DeviceInfo), 0);
+
 		if (NetworkSendThread == nullptr) {
 			NetworkSendThread = new std::thread([&]() -> void {
 				while (canRunning) {
@@ -409,8 +420,9 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 				}
 				});
 		}
-
+	}
 		break;
+
 	case APP_CMD_SAVE_STATE:
 		// 시스템에서 현재 상태를 저장하도록 요청했습니다. 저장하세요.
 		engine->app->savedState = malloc(sizeof(struct saved_state));

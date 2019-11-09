@@ -202,7 +202,7 @@ bool Client::SendData(Packet* packet) {
 	return true;
 }
 
-void Client::PushPacketWQueue(unique_ptr<Packet>&& packet) {
+void Client::PushPacketWQueue(unique_ptr<Packet> packet) {
 
 	HEADER* header = (HEADER*)packet->mHeader.buf;
 
@@ -219,7 +219,9 @@ void Client::PushPacketWQueue(unique_ptr<Packet>&& packet) {
 }
 void Client::PopPacketRQueue() {
 	--reqFrameCount;
-	rQueue.FrontItem().release();
+	auto  p = rQueue.FrontItem().release();
+	if (p)
+		delete p;
 	rQueue.PopItem();
 }
 
@@ -229,8 +231,9 @@ char* Client::GetData() {
 	return (char*)packet->mData.buf;
 }
 
-void Client::ReleaseBuffer() {
-
+int Client::GetSocket() {
+	return serverSock;
 }
+
 
 
