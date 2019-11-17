@@ -40,3 +40,4 @@
 
 #include "Receiver.h"
 #include "lz4.h"
+#include "QuickLZ.h"

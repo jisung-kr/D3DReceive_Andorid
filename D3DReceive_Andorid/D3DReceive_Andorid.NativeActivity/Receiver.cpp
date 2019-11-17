@@ -51,6 +51,10 @@ bool Client::RecvMSG() {
 
 		//OutputDebugStringA("Queue에 Packet 저장\n");
 	}
+	else {
+		usleep(80000);
+		//sleep(1);
+	}
 
 	return true;
 }
@@ -128,8 +132,10 @@ bool Client::SendMSG() {
 
 
 		isUsingInputWQueue = false;
+		delete packet.release();
 		//OutputDebugStringA("Queue에서 Packet 삭제\n");
 	}
+
 
 	if (wQueue.Size() > 0 && isUsingWQueue == false) {
 		isUsingWQueue = true;
@@ -144,8 +150,9 @@ bool Client::SendMSG() {
 		
 
 		isUsingWQueue = false;
+		delete packet.release();
 		//OutputDebugStringA("Queue에서 Packet 삭제\n");
-	}
+	} 
 
 	return true;
 }

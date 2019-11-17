@@ -181,10 +181,19 @@ bool loadTextures(char* bitmap)
 bool init()
 {
 	//압축 해제 후 텍스쳐 생성
-	int size = mClientWidth * mClientHeight * 4;
-	char* srcData = new char[size];
 
+	int size = mClientWidth * mClientHeight * 4;
+
+	//압축해제 - LZ4
+	/*
+	char* srcData = new char[size];
 	LZ4_decompress_fast(gClient.GetData(), srcData, size);
+	*/
+	//압축해제 - QuickLZ
+	char* srcData = new char[size];
+	qlz_state_decompress stateDecomp;
+	qlz_decompress(gClient.GetData(), srcData, &stateDecomp);
+
 	loadTextures(srcData);
 
 	delete[] srcData;
@@ -238,7 +247,9 @@ static void engine_draw_frame(struct engine* engine) {
 		// 디스플레이가 없습니다.
 		return;
 	}
-
+	gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));
+	gClient.SendMSG();
+	gClient.RecvMSG();
 	if (gClient.SizeRQueue() > 0) {
 		// 그리기는 화면 업데이트 속도의 제한을 받으므로
 		// 여기에서는 타이밍을 계산할 필요가 없습니다.
@@ -253,7 +264,7 @@ static void engine_draw_frame(struct engine* engine) {
 		//버퍼 스와핑
 		eglSwapBuffers(engine->display, engine->surface);
 
-
+		//RQueue에서 패킷제거
 		gClient.PopPacketRQueue();
 	}
 
@@ -292,20 +303,24 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 
 	__android_log_print(ANDROID_LOG_DEBUG, "Debug", "SourceType = %d \nEventType = %d\nActionType = %d", sourceType, eventType, actionType);
 
-
+	/*	*/
 	if (sourceType & AINPUT_SOURCE_JOYSTICK) {
 		if (eventType == AINPUT_EVENT_TYPE_KEY) {
+			if (actionType == AKEY_EVENT_ACTION_DOWN) {
+				__android_log_print(ANDROID_LOG_DEBUG, "Debug", "KEY_DOWN");
+			}else if (actionType == AMOTION_EVENT_ACTION_MOVE) {
+			
 
+				__android_log_print(ANDROID_LOG_DEBUG, "Debug", "KEY_MOVE");
+
+				return 0;
+			}
+			
 		}
 		else if (eventType == AINPUT_EVENT_TYPE_MOTION) {
-			/*		*/
-			if (actionType == AMOTION_EVENT_ACTION_DOWN) {
-				engine->state.x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
-				engine->state.y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
-				engine->state.z = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
-				engine->state.w = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
-			}
-			else if (actionType == AMOTION_EVENT_ACTION_MOVE) {
+
+			if (actionType == AMOTION_EVENT_ACTION_MOVE) {
+		
 				// xy는 왼쪽 축
 				// wz는 오른쪽 축
 				float x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
@@ -313,14 +328,8 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 				float z = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
 				float w = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
 
-				float lastX = engine->state.x;
-				float lastY = engine->state.y;
-				float lastZ = engine->state.z;
-				float lastW = engine->state.w;
-
 				float dx = x;
 				float dy = -y;
-
 				{	
 					INPUT_DATA* data = new INPUT_DATA();
 					int dataSize = sizeof(INPUT_DATA);
@@ -331,13 +340,11 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 					data->y = dy * 10;
 
 					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
-				
 				}
 
 	
-				float dz = ConvertToRadian(0.25f * static_cast<float>(z - lastZ));
-				float dw = ConvertToRadian(0.25f * static_cast<float>(w - lastW));
-
+				float dz = ConvertToRadian(0.25f * static_cast<float>(z));
+				float dw = ConvertToRadian(0.25f * static_cast<float>(w));
 				{
 					INPUT_DATA* data = new INPUT_DATA();
 					int dataSize = sizeof(INPUT_DATA);
@@ -350,19 +357,11 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
 					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_INPUT, dataSize), data));
 				}
 
-
-				engine->state.x = x;
-				engine->state.y = y;
-				engine->state.w = w;
-				engine->state.z = z;
-
 				__android_log_print(ANDROID_LOG_DEBUG, "Debug", "Down X = %f / Y = %f / Z = %f / W = %f", x, y, z, w);
 				
 				return 0;
+			
 			}
-
-
-	
 
 		}
 	}
@@ -396,16 +395,19 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 		Packet helloPacket = Packet(new CHEADER(COMMAND::COMMAND_HELLO, sizeof(DeviceInfo)), (void*)& dInfo);
 
 		send(gClient.GetSocket(), (char*)& dInfo, sizeof(DeviceInfo), 0);
-
+		/*	*/
 		if (NetworkSendThread == nullptr) {
 			NetworkSendThread = new std::thread([&]() -> void {
 				while (canRunning) {
 					gClient.PushPacketWQueue(std::make_unique<Packet>(new CHEADER(COMMAND::COMMAND_REQ_FRAME)));
 
 					if (!gClient.SendMSG()) {
-						break;
+						//break;
 					}
+					//sleep(1);
+					//usleep(7000);
 					LOGW("Sending Success...\n");
+					
 				}
 				});
 		}
@@ -414,12 +416,16 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 			NetworkRecvThread = new std::thread([&]() -> void {
 				while (canRunning) {
 					if (!gClient.RecvMSG()) {
-						break;
+						//break;
 					}
+					//usleep(7000);
+					//sleep(1);
+
 					LOGW("Receiving Success...\n");
 				}
 				});
 		}
+	
 	}
 		break;
 

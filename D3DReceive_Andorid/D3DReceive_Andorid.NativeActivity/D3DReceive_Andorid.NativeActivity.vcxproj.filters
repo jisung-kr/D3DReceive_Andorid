@@ -12,6 +12,9 @@
     <ClInclude Include="lz4.h">
       <Filter>Codec</Filter>
     </ClInclude>
+    <ClInclude Include="QuickLZ.h">
+      <Filter>Codec</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />
@@ -23,6 +26,9 @@
       <Filter>Queue</Filter>
     </ClCompile>
     <ClCompile Include="lz4.cpp">
+      <Filter>Codec</Filter>
+    </ClCompile>
+    <ClCompile Include="QuickLZ.cpp">
       <Filter>Codec</Filter>
     </ClCompile>
   </ItemGroup>

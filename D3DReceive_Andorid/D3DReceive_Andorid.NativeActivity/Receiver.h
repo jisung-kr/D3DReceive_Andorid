@@ -4,7 +4,7 @@
 #include "BitmapQueue.h"
 
 
-#define SERVER_IP "121.131.125.43"
+#define SERVER_IP "121.131.166.159"
 #define PORT 45000
 
 
